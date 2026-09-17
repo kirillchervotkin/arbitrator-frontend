@@ -1,6 +1,7 @@
 import { AppBar, Toolbar, Typography, Button, Box, IconButton, Tooltip } from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
+import LinkIcon from '@mui/icons-material/Link';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -38,11 +39,11 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AppBar position="static" sx={{ bgcolor: 'background.paper', color: 'text.primary', boxShadow: 1 }}>
-        <Toolbar>
+        <Toolbar sx={{ flexWrap: 'wrap', py: 1, gap: 1 }}>
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
             Admin Panel
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <Button
               component={Link}
               to="/"
@@ -114,6 +115,10 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
               startIcon={<AssessmentIcon />}
             >
               Отчёт по нормативам
+            </Button>
+            <Button component={Link} to="/connected-accounts" color="inherit"
+              variant={isActive('/connected-accounts') ? 'contained' : 'text'} startIcon={<LinkIcon />}>
+              Связанные аккаунты
             </Button>
             <Tooltip title="Выйти">
               <IconButton onClick={handleLogout} color="error">

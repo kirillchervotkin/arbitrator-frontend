@@ -26,6 +26,7 @@ export default function Dashboard() {
         <Typography variant="body1" sx={{ mt: 2 }}>
           Вы успешно вошли в систему. Выберите раздел для управления.
         </Typography>
+        <Button sx={{ mt: 3 }} variant="outlined" onClick={() => navigate('/connected-accounts')}>Связанные аккаунты · Polar</Button>
         <Box sx={{ mt: 4, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <Button
             variant="contained"

@@ -563,3 +563,11 @@ export const questionnaireApi = {
   delete: (userId: string) =>
     api.delete<void>(`/questionnaires/${userId}`),
 };
+
+// OAuth tokens stay on the backend; the frontend receives only the authorization URL.
+export const oauthApi = {
+  status: () => api.get<{ polar: { connected: boolean } }>('/oauth/status'),
+  connect: (provider: 'polar') => api.get<{ url: string }>('/oauth/connect', {
+    params: { provider, client_type: 'web' },
+  }),
+};

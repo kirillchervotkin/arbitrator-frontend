@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import ConnectedAccountsPage from './pages/ConnectedAccountsPage';
 import UsersPage from './pages/UsersPage';
 import ListsPage from './pages/ListsPage';
 import UsersManagementPage from './pages/UsersManagementPage';
@@ -24,6 +25,7 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/connected-accounts" element={<ProtectedRoute><Navbar><ConnectedAccountsPage /></Navbar></ProtectedRoute>} />
         <Route path="/login" element={<Login />} />
         <Route
           path="/"
