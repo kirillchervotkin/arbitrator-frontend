@@ -1,3 +1,7 @@
+import ScheduleReferencesPage from './pages/schedule/ReferencesPage';
+import TournamentsPage from './pages/schedule/TournamentsPage';
+import TournamentPage from './pages/schedule/TournamentPage';
+import TemplatesPage from './pages/schedule/TemplatesPage';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -28,6 +32,10 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/tournaments/references" element={<ProtectedRoute><Navbar><ScheduleReferencesPage /></Navbar></ProtectedRoute>} />
+        <Route path="/tournaments" element={<ProtectedRoute><Navbar><TournamentsPage /></Navbar></ProtectedRoute>} />
+        <Route path="/tournaments/:id" element={<ProtectedRoute><Navbar><TournamentPage /></Navbar></ProtectedRoute>} />
+        <Route path="/tournament-templates" element={<ProtectedRoute><Navbar><TemplatesPage /></Navbar></ProtectedRoute>} />
         <Route path="/login" element={<Login />} />
 
         <Route

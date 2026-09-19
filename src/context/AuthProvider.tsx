@@ -22,7 +22,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Бэкенд возвращает токены в snake_case
       const accessToken = response.data.access_token;
       const refreshToken = response.data.refresh_token;
-      console.log(accessToken);
       if (!accessToken) {
         throw new Error('Токен доступа не получен от сервера');
       }

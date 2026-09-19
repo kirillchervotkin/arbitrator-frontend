@@ -25,6 +25,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
 
   // Подсветка активного маршрута: для вложенных путей учитываем префикс
   const isActive = (path: string) => {
+    if (path === '/tournaments') return location.pathname.startsWith('/tournaments') || location.pathname.startsWith('/tournament-templates');
     if (path === '/training-camps') {
       return location.pathname.startsWith('/training-camps');
     }
@@ -57,6 +58,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             >
               Главная
             </Button>
+            <Button component={Link} to="/tournaments" color="inherit" variant={isActive('/tournaments') ? 'contained' : 'text'} startIcon={<EmojiEventsIcon />}>Турниры</Button>
             <Button
               component={Link}
               to="/users"

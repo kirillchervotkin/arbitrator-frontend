@@ -46,7 +46,7 @@ import {
 
 const api = axios.create({
   baseURL: '/api',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', 'Accept-Language': 'ru' },
 });
 
 // Перехватчик запросов – добавляет токен
@@ -65,15 +65,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    console.group('❌ Ошибка запроса');
-    console.log('URL:', error.config?.url);
-    console.log('Метод:', error.config?.method?.toUpperCase());
-    console.log('Статус:', error.response?.status);
-    console.log('Заголовки запроса:', error.config?.headers);
-    console.log('Тело запроса:', error.config?.data);
-    console.log('Ответ сервера (data):', error.response?.data);
-    console.log('Полный объект ошибки:', error);
-    console.groupEnd();
+    console.error('Ошибка API', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status);
     return Promise.reject(error);
   },
 );
