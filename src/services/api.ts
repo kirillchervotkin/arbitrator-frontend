@@ -37,6 +37,11 @@ import {
   UploadResultsDto,
   UpdateResultDto,
   GetResultsQuery,
+  // OAuth / Связанные аккаунты
+  PolarStatusResponse,
+  UpdateTrainingSessionData,
+  RawSamplesResponse,
+  TrainingSessionWithSamples,
 } from '../types';
 
 const api = axios.create({
@@ -566,8 +571,71 @@ export const questionnaireApi = {
 
 // OAuth tokens stay on the backend; the frontend receives only the authorization URL.
 export const oauthApi = {
-  status: () => api.get<{ polar: { connected: boolean } }>('/oauth/status'),
-  connect: (provider: 'polar') => api.get<{ url: string }>('/oauth/connect', {
-    params: { provider, client_type: 'web' },
-  }),
+  /**
+   * GET /oauth/status
+   * Возвращает актуальный статус связки Polar:
+   *   - connected: boolean | null  (null = «неизвестно»);
+   *   - reason: 'connected' | 'consents_required'
+   *           | 'not_registered' | 'not_linked' | 'unknown'.
+   *
+   * Бэкенд при каждом вызове пингует Polar /v3/users/{polar-user-id},
+   * так что страница «Связанные аккаунты» всегда видит реальное
+   * состояние, а не кэш из БД.
+   */
+  status: () =>
+    api.get<PolarStatusResponse>('/oauth/status'),
+
+  /**
+   * GET /oauth/connect
+   * Получить URL для OAuth-авторизации Polar.
+   * Всегда client_type=web — попап во фронте.
+   */
+  connect: (provider: 'polar') =>
+    api.get<{ url: string }>('/oauth/connect', {
+      params: { provider, client_type: 'web' },
+    }),
+
+  /**
+   * POST /oauth/disconnect
+   * Полный сброс связки Polar для текущего пользователя:
+   *   1. DELETE /v3/users/{polar-user-id} на стороне Polar
+   *      (best-effort: ошибки 403/404 не считаются провалом);
+   *   2. очистка локальных токенов (oauthTokenService.revokeToken).
+   *
+   * Используется кнопкой «Сбросить и подключить заново» в UI,
+   * чтобы после сброса пользователь прошёл OAuth-флоу заново
+   * и Polar снова показал экран согласий.
+   */
+  disconnect: () =>
+    api.post<{ ok: boolean }>('/oauth/disconnect'),
 };
+
+export const trainingApi = {
+  list: (params: {
+    from: string;
+    to: string;
+    limit?: number;
+  }) => api.get('/training-sessions', { params }),
+
+  getOne: (provider: string, externalId: string) =>
+    api.get<TrainingSessionWithSamples>(
+      `/training-sessions/${provider}/${externalId}`,
+    ),
+
+  getRawSamples: (provider: string, externalId: string) =>
+    api.get<RawSamplesResponse>(
+      `/training-sessions/${provider}/${externalId}/raw-samples`,
+    ),
+
+  update: (
+    provider: string,
+    externalId: string,
+    data: Partial<UpdateTrainingSessionData>,
+  ) =>
+    api.patch(`/training-sessions/${provider}/${externalId}`, data),
+
+  delete: (provider: string, externalId: string) =>
+    api.delete(`/training-sessions/${provider}/${externalId}`),
+};
+
+export default api;

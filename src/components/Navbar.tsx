@@ -11,6 +11,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'; // иконка для лагерей
 import ScienceIcon from '@mui/icons-material/Science'; // иконка для типов тестов
 import LeaderboardIcon from '@mui/icons-material/Leaderboard'; // иконка для результатов
+import FitnessCenterIcon from '@mui/icons-material/FitnessCenter'; // иконка для тренировок
 
 export default function Navbar({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
@@ -26,6 +27,9 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => {
     if (path === '/training-camps') {
       return location.pathname.startsWith('/training-camps');
+    }
+    if (path === '/training-sessions') {
+      return location.pathname.startsWith('/training-sessions');
     }
     if (path === '/results') {
       return location.pathname.startsWith('/results');
@@ -88,6 +92,15 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
               startIcon={<EmojiEventsIcon />}
             >
               Сборы
+            </Button>
+            <Button
+              component={Link}
+              to="/training-sessions"
+              color="inherit"
+              variant={isActive('/training-sessions') ? 'contained' : 'text'}
+              startIcon={<FitnessCenterIcon />}
+            >
+              Тренировки
             </Button>
             <Button
               component={Link}

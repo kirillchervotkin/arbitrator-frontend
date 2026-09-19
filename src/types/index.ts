@@ -50,6 +50,57 @@ export interface AuthTokens {
   refresh_token: string;
 }
 
+// ===== OAuth / Связанные аккаунты =====
+/**
+ * Причина, по которой связка с Polar отсутствует или неактивна.
+ * Соответствует `PolarUserStatus` на бэкенде + локальные состояния.
+ *
+ * - connected         — зарегистрирован в Polar, согласия приняты;
+ * - consents_required — зарегистрирован, но обязательные согласия
+ *                       не приняты или отозваны (403 от /v3/users);
+ * - not_registered    — Polar не знает пользователя (204/401);
+ * - not_linked        — у нас нет сохранённого access token;
+ * - unknown           — не удалось определить (сеть/5xx).
+ */
+export type PolarStatusReason =
+  | 'connected'
+  | 'consents_required'
+  | 'not_registered'
+  | 'not_linked'
+  | 'unknown';
+
+/**
+ * Ответ `GET /oauth/status`.
+ * `connected === null` означает «неизвестно» (см. reason === 'unknown').
+ */
+export interface PolarStatusResponse {
+  polar: {
+    connected: boolean | null;
+    reason: PolarStatusReason;
+  };
+}
+
+/**
+ * Коды ошибок, которые бэкенд прокидывает во фронт через
+ * `window.opener.postMessage({ type: 'OAUTH_CONNECT', success, error })`.
+ */
+export type OAuthErrorCode =
+  | 'invalid_state'
+  | 'authorization_declined'
+  | 'consents_required'
+  | 'already_linked'
+  | 'unsupported_client_type'
+  | 'connection_failed';
+
+/**
+ * Разобранный результат OAuth-попапа.
+ * Возвращается `readOAuthResult` из `utils/oauth`.
+ */
+export interface OAuthResult {
+  success: boolean;
+  error: OAuthErrorCode | null;
+}
+
 // ===== Список (List) =====
 export interface List {
   id: string;
@@ -483,3 +534,91 @@ export interface GetResultsQuery {
   orderBy?: 'time' | 'legNumber';
   orderDir?: 'ASC' | 'DESC';
 }
+
+// ============================================================
+// ===== Тренировки (Training Sessions) =====
+// ============================================================
+
+/** Ключи сэмплов — совпадают с SampleType на бэке */
+export type SampleType =
+  | 'hr'
+  | 'speed'
+  | 'power'
+  | 'cadence'
+  | 'altitude'
+  | 'distance'
+  | 'temperature';
+
+/** Распакованный сэмпл одного типа (ответ getOne) */
+export type ParsedSample = {
+  intervalSec: number;
+  values: number[];
+};
+
+/** Сырой блоб одного типа (ответ getRawSamples) */
+export type RawSample = {
+  intervalSec: number;
+  /** base64, little-endian */
+  samplesBase64: string;
+};
+
+/** Ответ GET /training-sessions/:provider/:externalId/raw-samples */
+export type RawSamplesResponse = {
+  sessionId: string;
+  samples: Partial<Record<SampleType, RawSample>>;
+};
+
+/** Коды видов спорта — зеркало SPORT_CODES из update-training-session.dto.ts */
+export type SportCode =
+  | 'running'
+  | 'cycling'
+  | 'swimming'
+  | 'walking'
+  | 'hiking'
+  | 'strength'
+  | 'cardio'
+  | 'yoga'
+  | 'rowing'
+  | 'skiing'
+  | 'skating'
+  | 'tennis'
+  | 'football'
+  | 'basketball'
+  | 'other';
+
+/** Элемент списка (GET /training-sessions) */
+export type TrainingSessionListItem = {
+  id: string;
+  provider: string;
+  externalId: string;
+  startTime: string; // ISO 8601
+  durationSec: number;
+  sport: SportCode | null;
+  distanceM: number | null;
+  calories: number | null;
+  hrAvg: number | null;
+  hrMax: number | null;
+  hrMin: number | null;
+  ascentM: number | null;
+  descentM: number | null;
+  name: string | null;
+  notes: string | null;
+};
+
+/** Одна тренировка с распакованными сэмплами (GET /training-sessions/:provider/:externalId) */
+export type TrainingSessionWithSamples = TrainingSessionListItem & {
+  samples: Partial<Record<SampleType, ParsedSample>>;
+};
+
+/** Ответ списка тренировок (GET /training-sessions) */
+export type ListTrainingSessionsResponse = {
+  sessions: TrainingSessionListItem[];
+  sportTypes: Record<string, { ru: string; en: string }>;
+};
+
+/** Body для PATCH /training-sessions/:provider/:externalId */
+export type UpdateTrainingSessionData = {
+  name?: string | null;
+  notes?: string | null;
+  sport?: SportCode | null;
+};

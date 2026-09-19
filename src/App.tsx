@@ -20,13 +20,16 @@ import TestTypesPage from './pages/TestTypesPage';
 import TestGradesPage from './pages/TestGradesPage';
 // Импорт страницы результатов тестов
 import ResultsPage from './pages/ResultsPage';
+// Импорт страниц тренировок
+import TrainingSessionsPage from './pages/TrainingSessionsPage';
+import TrainingSessionPage from './pages/TrainingSessionPage';
 
 function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/connected-accounts" element={<ProtectedRoute><Navbar><ConnectedAccountsPage /></Navbar></ProtectedRoute>} />
         <Route path="/login" element={<Login />} />
+
         <Route
           path="/"
           element={
@@ -37,6 +40,18 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/connected-accounts"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <ConnectedAccountsPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/users"
           element={
@@ -47,6 +62,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/lists"
           element={
@@ -57,6 +73,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/lists/:listId/users"
           element={
@@ -67,6 +84,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/standards-report"
           element={
@@ -77,6 +95,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/questionnaires"
           element={
@@ -87,6 +106,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/questionnaires/:userId"
           element={
@@ -97,6 +117,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         {/* Маршруты тренировочных лагерей */}
         <Route
           path="/training-camps"
@@ -108,6 +129,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/training-camps/:campId/participants"
           element={
@@ -118,6 +140,30 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Маршруты тренировок */}
+        <Route
+          path="/training-sessions"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <TrainingSessionsPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/training-sessions/:provider/:externalId"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <TrainingSessionPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Маршрут типов тестов */}
         <Route
           path="/test-types"
@@ -129,6 +175,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         {/* Маршрут градаций типа теста */}
         <Route
           path="/test-types/:testTypeId/grades"
@@ -140,6 +187,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         {/* Маршрут управления результатами тестов */}
         <Route
           path="/results"
@@ -151,6 +199,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>
