@@ -622,3 +622,338 @@ export type UpdateTrainingSessionData = {
   notes?: string | null;
   sport?: SportCode | null;
 };
+
+// ============================================================
+// ===== Турниры (Tournaments) =====
+// ============================================================
+//
+// Турнир — корневая сущность календаря. Тип определяет характер
+// соревнования:
+//   - LEAGUE     — регулярный чемпионат (Вторая лига А/Б);
+//   - CUP        — кубок со стадиями и плей-офф (Кубок России);
+//   - SUPER_CUP  — одноматчевый турнир.
+//
+// На фронте даты приходят как ISO-строки (NestJS сериализует Date
+// в ISO автоматически).
+
+export type TournamentType = 'LEAGUE' | 'CUP' | 'SUPER_CUP';
+
+export interface Tournament {
+  id: string;
+  name: string;
+  season: string;       // '2023/24'
+  type: TournamentType;
+  startDate: string | null;  // ISO 8601
+  endDate: string | null;    // ISO 8601
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTournamentDto {
+  name: string;
+  season: string;
+  type: TournamentType;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface UpdateTournamentDto {
+  name?: string;
+  season?: string;
+  type?: TournamentType;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface FindTournamentsQuery {
+  season?: string;
+  type?: TournamentType;
+  orderBy?: 'name' | 'season' | 'createdAt';
+  orderDir?: 'ASC' | 'DESC';
+}
+
+// ============================================================
+// ===== Этапы турнира (Stages) =====
+// ============================================================
+//
+// Этап — узел дерева структуры турнира. Бывает:
+//   - STAGE   — контейнер («Групповой этап»);
+//   - GROUP   — группа (format = ROUND_ROBIN);
+//   - ROUND   — раунд плей-офф (format = ELIMINATION);
+//   - PLAYOFF — контейнер для плей-офф.
+//
+// `format` = null для контейнеров STAGE/PLAYOFF.
+// `parentStageId` = null для корневых этапов.
+// `settings` — гибкие параметры (очки, тай-брейки, правила обмена).
+
+export type StageType = 'STAGE' | 'GROUP' | 'ROUND' | 'PLAYOFF';
+export type StageFormat = 'ROUND_ROBIN' | 'ELIMINATION';
+
+export interface Stage {
+  id: string;
+  tournamentId: string;
+  parentStageId: string | null;
+  name: string;
+  type: StageType;
+  format: StageFormat | null;
+  sortOrder: number;
+  settings: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Элемент дерева этапов (ответ GET /tournaments/:id/stages/tree) */
+export interface StageTreeItem extends Stage {
+  children: StageTreeItem[];
+}
+
+export interface CreateStageDto {
+  name: string;
+  type: StageType;
+  format?: StageFormat | null;
+  parentStageId?: string | null;
+  sortOrder?: number;
+  settings?: Record<string, unknown> | null;
+}
+
+export interface UpdateStageDto {
+  name?: string;
+  type?: StageType;
+  format?: StageFormat | null;
+  parentStageId?: string | null;
+  sortOrder?: number;
+  settings?: Record<string, unknown> | null;
+}
+
+export interface FindStagesQuery {
+  type?: StageType;
+  rootOnly?: boolean;
+  parentStageId?: string;
+}
+
+// ============================================================
+// ===== Города (Cities) =====
+// ============================================================
+
+export interface City {
+  id: string;
+  name: string;
+  region: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCityDto {
+  name: string;
+  region?: string | null;
+}
+
+export interface UpdateCityDto {
+  name?: string;
+  region?: string | null;
+}
+
+export interface FindCitiesQuery {
+  search?: string;    // частичный поиск по имени (автокомплит)
+  region?: string;    // точное совпадение
+  orderBy?: 'name' | 'region' | 'createdAt';
+  orderDir?: 'ASC' | 'DESC';
+}
+
+// ============================================================
+// ===== Команды (Teams) =====
+// ============================================================
+
+export interface Team {
+  id: string;
+  name: string;
+  shortName: string | null;
+  cityId: string | null;
+}
+
+export interface CreateTeamDto {
+  name: string;
+  shortName?: string | null;
+  cityId?: string | null;
+}
+
+export interface UpdateTeamDto {
+  name?: string;
+  shortName?: string | null;
+  cityId?: string | null;
+}
+
+export interface FindTeamsQuery {
+  search?: string;      // частичный поиск по имени
+  shortName?: string;   // частичный поиск по короткому имени
+  cityId?: string;      // точное совпадение
+  orderBy?: 'name' | 'shortName';
+  orderDir?: 'ASC' | 'DESC';
+}
+
+// ============================================================
+// ===== Матчи (Matches) =====
+// ============================================================
+//
+// Матч всегда привязан к этапу через `stageId`. Этап определяет,
+// круговой это матч (с туром) или плей-офф (без тура).
+//
+// `tourNumber` — номер тура (для ROUND_ROBIN). null для плей-офф.
+// `homeTeamId` / `awayTeamId` — nullable. Для плей-офф создаются
+//   без команд, заполняются позже.
+// `homeScore` / `awayScore` — null, пока матч не сыгран.
+
+export interface Match {
+  id: string;
+  tournamentId: string;
+  stageId: string;
+  tourNumber: number | null;
+  matchDate: string;  // ISO 8601
+  cityId: string;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
+export interface CreateMatchDto {
+  matchDate: string;
+  cityId: string;
+  tourNumber?: number | null;
+  homeTeamId?: string | null;
+  awayTeamId?: string | null;
+}
+
+export interface UpdateMatchDto {
+  matchDate?: string;
+  cityId?: string;
+  tourNumber?: number | null;
+  homeTeamId?: string | null;
+  awayTeamId?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+}
+
+export interface FindMatchesQuery {
+  tournamentId?: string;
+  stageId?: string;
+  cityId?: string;
+  teamId?: string;
+  tourNumber?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+  offset?: number;
+  orderBy?: 'matchDate' | 'tourNumber';
+  orderDir?: 'ASC' | 'DESC';
+}
+
+// ============================================================
+// ===== Роли на поле (Field Roles) =====
+// ============================================================
+//
+// Справочник фиксированный (5 ролей): REFEREE, ASSISTANT, RESERVE,
+// VAR, AVAR. `code` — ключ локализации на фронте, `name` —
+// русский fallback, `sortOrder` — порядок отображения.
+
+export interface FieldRole {
+  id: string;
+  code: string;      // 'REFEREE' | 'ASSISTANT' | 'RESERVE' | 'VAR' | 'AVAR'
+  name: string;      // 'Главный судья'
+  sortOrder: number;
+}
+
+export interface CreateFieldRoleDto {
+  code: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface UpdateFieldRoleDto {
+  code?: string;
+  name?: string;
+  sortOrder?: number;
+}
+
+export interface FindFieldRolesQuery {
+  code?: string;
+  name?: string;
+  orderBy?: 'sortOrder' | 'code' | 'name';
+  orderDir?: 'ASC' | 'DESC';
+}
+
+// ============================================================
+// ===== Назначения (Assignments) =====
+// ============================================================
+//
+// Назначение — связка «судья X на матч Y в роли Z».
+// Бригада может быть неполной — «на матч должен быть REFEREE»
+// не проверяется.
+//
+// Бэкенд при создании/обновлении проверяет (в одной транзакции):
+//   1. Матч, судья, роль существуют;
+//   2. Судья не назначен на этот матч дважды;
+//   3. Судья не назначен на другой матч в тот же день.
+
+export interface Assignment {
+  id: string;
+  matchId: string;
+  userId: string;
+  fieldRoleId: string;
+}
+
+export interface CreateAssignmentDto {
+  userId: string;
+  fieldRoleId: string;
+}
+
+export interface UpdateAssignmentDto {
+  userId?: string;
+  fieldRoleId?: string;
+}
+
+export interface FindAssignmentsQuery {
+  matchId?: string;
+  userId?: string;
+  fieldRoleId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  orderDir?: 'ASC' | 'DESC';
+}
+
+/**
+ * Назначение с деталями: ФИО судьи и данные роли.
+ * Используется в ответе GET /matches/:id/crew.
+ */
+export interface AssignmentWithDetails {
+  id: string;
+  matchId: string;
+  userId: string;
+  userFirstName: string;
+  userLastName: string;
+  fieldRoleId: string;
+  roleCode: string;
+  roleName: string;
+  roleSortOrder: number;
+}
+
+/**
+ * Ответ GET /matches/:matchId/crew.
+ * Матч + команды + город + этап + бригада одним объектом.
+ */
+export interface MatchCrew {
+  matchId: string;
+  matchDate: string;
+  tourNumber: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  homeTeamId: string | null;
+  homeTeamName: string | null;
+  awayTeamId: string | null;
+  awayTeamName: string | null;
+  cityId: string;
+  cityName: string;
+  stageId: string;
+  stageName: string;
+  crew: AssignmentWithDetails[];
+}

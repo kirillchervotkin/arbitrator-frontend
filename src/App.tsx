@@ -1,7 +1,13 @@
-import ScheduleReferencesPage from './pages/schedule/ReferencesPage';
-import TournamentsPage from './pages/schedule/TournamentsPage';
-import TournamentPage from './pages/schedule/TournamentPage';
-import TemplatesPage from './pages/schedule/TemplatesPage';
+import TournamentsPage from './pages/TournamentsPage';
+import TournamentPage from './pages/TournamentPage';
+// ===== Календарь и судейство (новые страницы) =====
+import CitiesPage from './pages/CitiesPage';
+import TeamsPage from './pages/TeamsPage';
+import FieldRolesPage from './pages/FieldRolesPage';
+import MatchesPage from './pages/MatchesPage';
+import MatchPage from './pages/MatchPage';
+import AssignmentsPage from './pages/AssignmentsPage';
+
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -32,12 +38,98 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/tournaments/references" element={<ProtectedRoute><Navbar><ScheduleReferencesPage /></Navbar></ProtectedRoute>} />
-        <Route path="/tournaments" element={<ProtectedRoute><Navbar><TournamentsPage /></Navbar></ProtectedRoute>} />
-        <Route path="/tournaments/:id" element={<ProtectedRoute><Navbar><TournamentPage /></Navbar></ProtectedRoute>} />
-        <Route path="/tournament-templates" element={<ProtectedRoute><Navbar><TemplatesPage /></Navbar></ProtectedRoute>} />
+        {/* ===== Календарь: турниры ===== */}
+        <Route
+          path="/tournaments"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <TournamentsPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tournaments/:id"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <TournamentPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ===== Справочники календаря ===== */}
+        <Route
+          path="/cities"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <CitiesPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teams"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <TeamsPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/field-roles"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <FieldRolesPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ===== Матчи ===== */}
+        <Route
+          path="/matches"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <MatchesPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/matches/:matchId"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <MatchPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ===== Назначения (отчёты) ===== */}
+        <Route
+          path="/assignments"
+          element={
+            <ProtectedRoute>
+              <Navbar>
+                <AssignmentsPage />
+              </Navbar>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ===== Авторизация ===== */}
         <Route path="/login" element={<Login />} />
 
+        {/* ===== Прочее ===== */}
         <Route
           path="/"
           element={
