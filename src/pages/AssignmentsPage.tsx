@@ -1,7 +1,19 @@
+import { competitionPageSx } from '../components/competition/competitionStyles';
+import {
+  calendarDayBoundary,
+  calendarRangeError,
+} from '../utils/calendarFilters';
+import {
+  CompetitionFilters,
+  CompetitionHeader,
+  CompetitionEmpty,
+  CompetitionSummary,
+} from '../components/competition/CompetitionPage';
 // src/pages/AssignmentsPage.tsx
 
 import { useState, useMemo } from 'react';
 import {
+  Autocomplete,
   Box,
   Typography,
   Paper,
@@ -33,7 +45,7 @@ import {
   Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import {
   assignmentApi,
@@ -80,10 +92,23 @@ export default function AssignmentsPage() {
   const navigate = useNavigate();
 
   // --- Фильтры ---
-  const [userFilter, setUserFilter] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const updateFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setSearchParams(next);
+  };
+  const userFilter = searchParams.get('userId') ?? '';
+  const roleFilter = searchParams.get('fieldRoleId') ?? '';
+  const dateFrom = searchParams.get('dateFrom') ?? '';
+  const dateTo = searchParams.get('dateTo') ?? '';
+  const setUserFilter = (value: string) => updateFilter('userId', value);
+  const setRoleFilter = (value: string) => updateFilter('fieldRoleId', value);
+  const setDateFrom = (value: string) => updateFilter('dateFrom', value);
+  const setDateTo = (value: string) => updateFilter('dateTo', value);
+
+  const rangeError = calendarRangeError(dateFrom, dateTo);
 
   // --- Удаление ---
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -111,29 +136,22 @@ export default function AssignmentsPage() {
     error,
     refetch,
   } = useQuery<Assignment[]>({
+    enabled: !rangeError,
     queryKey: [
       'assignments',
       {
         userId: userFilter || undefined,
         fieldRoleId: roleFilter || undefined,
-        dateFrom: dateFrom
-          ? new Date(`${dateFrom}T00:00:00`).toISOString()
-          : undefined,
-        dateTo: dateTo
-          ? new Date(`${dateTo}T23:59:59`).toISOString()
-          : undefined,
+        dateFrom: calendarDayBoundary(dateFrom),
+        dateTo: calendarDayBoundary(dateTo, true),
       },
     ],
     queryFn: async () => {
       const res = await assignmentApi.getAll({
         userId: userFilter || undefined,
         fieldRoleId: roleFilter || undefined,
-        dateFrom: dateFrom
-          ? new Date(`${dateFrom}T00:00:00`).toISOString()
-          : undefined,
-        dateTo: dateTo
-          ? new Date(`${dateTo}T23:59:59`).toISOString()
-          : undefined,
+        dateFrom: calendarDayBoundary(dateFrom),
+        dateTo: calendarDayBoundary(dateTo, true),
         orderDir: 'DESC',
       });
       return res.data;
@@ -238,20 +256,15 @@ export default function AssignmentsPage() {
     if (deleteAssignmentId) deleteMutation.mutate(deleteAssignmentId);
   };
 
-  const handleClearFilters = () => {
-    setUserFilter('');
-    setRoleFilter('');
-    setDateFrom('');
-    setDateTo('');
-  };
+  const handleClearFilters = () => setSearchParams({});
 
   const handleMatchClick = (matchId: string) => {
-    navigate(`/matches/${matchId}`);
+    navigate(`/matches/${matchId}`, {
+      state: { returnTo: `/assignments?${searchParams}` },
+    });
   };
 
-  const hasFilters = Boolean(
-    userFilter || roleFilter || dateFrom || dateTo,
-  );
+  const hasFilters = Boolean(userFilter || roleFilter || dateFrom || dateTo);
 
   // ------------------------------------------------------------------
   // Рендер строки "матч"
@@ -302,110 +315,145 @@ export default function AssignmentsPage() {
   // ------------------------------------------------------------------
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Назначения
-      </Typography>
-
-      {/* Информация */}
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Глобальный отчёт по назначениям. Создание назначений — на странице
-        матча. Здесь можно фильтровать и снимать назначения.
-      </Alert>
-
-      {/* Панель фильтров */}
-      <Paper
-        sx={{
-          p: 2,
-          mb: 3,
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 2,
-          alignItems: 'center',
-        }}
-      >
-        <TextField
-          select
-          size="small"
-          label="Судья"
-          value={userFilter}
-          onChange={(e) => setUserFilter(e.target.value)}
-          sx={{ minWidth: 220 }}
-        >
-          <MenuItem value="">
-            <em>Все судьи</em>
-          </MenuItem>
-          {users.map((u) => (
-            <MenuItem key={u.id} value={u.id}>
-              {formatUserName(u)}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <TextField
-          select
-          size="small"
-          label="Роль"
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="">
-            <em>Все роли</em>
-          </MenuItem>
-          {fieldRoles.map((r) => (
-            <MenuItem key={r.id} value={r.id}>
-              {r.name}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <TextField
-          size="small"
-          label="С даты матча"
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-          sx={{ minWidth: 170 }}
-        />
-
-        <TextField
-          size="small"
-          label="По дату матча"
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-          sx={{ minWidth: 170 }}
-        />
-
-        {hasFilters && (
+    <Box sx={competitionPageSx}>
+      <CompetitionHeader
+        title="Назначения"
+        description="Судьи, роли и матчи — все назначения в одном месте."
+        action={
           <Button
-            variant="outlined"
-            size="small"
-            startIcon={<ClearIcon />}
-            onClick={handleClearFilters}
+            variant="contained"
+            disableElevation
+            onClick={() => navigate('/matches')}
           >
-            Сбросить
+            Выбрать матч для назначения
           </Button>
-        )}
+        }
+      />
 
-        <Button
-          variant="contained"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          startIcon={
-            isFetching ? (
-              <CircularProgress size={20} color="inherit" />
-            ) : (
-              <RefreshIcon />
-            )
-          }
+      <CompetitionSummary
+        items={[
+          {
+            label: 'Назначений в выборке',
+            value: isLoading ? '—' : assignments.length,
+          },
+          {
+            label: 'Судей',
+            value: isLoading
+              ? '—'
+              : new Set(assignments.map((a) => a.userId)).size,
+          },
+          {
+            label: 'Матчей',
+            value: isLoading
+              ? '—'
+              : new Set(assignments.map((a) => a.matchId)).size,
+          },
+        ]}
+      />
+
+      {rangeError && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {rangeError}
+        </Alert>
+      )}
+      {/* Панель фильтров */}
+      <CompetitionFilters active={hasFilters}>
+        <Paper
+          sx={{
+            p: 2,
+            mb: 3,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 2,
+            alignItems: 'center',
+          }}
         >
-          Обновить
-        </Button>
-      </Paper>
+          <Autocomplete
+            options={users}
+            value={users.find((u) => u.id === userFilter) ?? null}
+            getOptionLabel={formatUserName}
+            isOptionEqualToValue={(a, b) => a.id === b.id}
+            onChange={(_, user) => setUserFilter(user?.id ?? '')}
+            noOptionsText="Судьи не найдены"
+            clearText="Сбросить"
+            openText="Показать судей"
+            closeText="Закрыть"
+            sx={{ flex: '1 1 240px', minWidth: 0 }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                size="small"
+                label="Судья"
+                placeholder="Поиск по имени"
+              />
+            )}
+          />
+
+          <TextField
+            select
+            size="small"
+            label="Роль"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            sx={{ minWidth: 200 }}
+          >
+            <MenuItem value="">
+              <em>Все роли</em>
+            </MenuItem>
+            {fieldRoles.map((r) => (
+              <MenuItem key={r.id} value={r.id}>
+                {r.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            size="small"
+            label="С даты матча"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ minWidth: 170 }}
+          />
+
+          <TextField
+            size="small"
+            label="По дату матча"
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ minWidth: 170 }}
+          />
+
+          {hasFilters && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ClearIcon />}
+              onClick={handleClearFilters}
+            >
+              Сбросить
+            </Button>
+          )}
+
+          <Button
+            variant="text"
+            onClick={() => refetch()}
+            disabled={isFetching || Boolean(rangeError)}
+            startIcon={
+              isFetching ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+          >
+            Обновить
+          </Button>
+        </Paper>
+      </CompetitionFilters>
 
       {/* Таблица */}
       <Paper sx={{ position: 'relative', overflow: 'hidden' }}>
@@ -417,13 +465,22 @@ export default function AssignmentsPage() {
               : 'Произошла неизвестная ошибка'}
           </Alert>
         ) : assignments.length === 0 && !isLoading ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body1" color="text.secondary">
-              {hasFilters
-                ? 'Ничего не найдено по фильтрам'
-                : 'Назначения не найдены. Назначьте судей на странице матча.'}
-            </Typography>
-          </Box>
+          <CompetitionEmpty
+            title={
+              hasFilters
+                ? 'Назначений по этим условиям нет'
+                : 'Назначений пока нет'
+            }
+            description={
+              hasFilters
+                ? 'Попробуйте другого судью, роль или период.'
+                : 'Откройте матч и добавьте судей в его бригаду. Назначения появятся здесь.'
+            }
+            action={hasFilters ? 'Сбросить фильтры' : 'Выбрать матч'}
+            onAction={
+              hasFilters ? handleClearFilters : () => navigate('/matches')
+            }
+          />
         ) : (
           <>
             <TableContainer>
@@ -443,8 +500,10 @@ export default function AssignmentsPage() {
 
                     return (
                       <TableRow key={a.id} hover>
-                        <TableCell>{renderMatchCell(a.matchId)}</TableCell>
-                        <TableCell>
+                        <TableCell data-label="Матч">
+                          {renderMatchCell(a.matchId)}
+                        </TableCell>
+                        <TableCell data-label="Судья">
                           {user ? (
                             <Box
                               sx={{
@@ -473,7 +532,7 @@ export default function AssignmentsPage() {
                             </Typography>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-label="Роль">
                           {role ? (
                             <Chip
                               label={role.name}
@@ -492,6 +551,7 @@ export default function AssignmentsPage() {
                           )}
                         </TableCell>
                         <TableCell
+                          data-label="Действия"
                           align="center"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -504,6 +564,7 @@ export default function AssignmentsPage() {
                           >
                             <Tooltip title="Открыть матч">
                               <IconButton
+                                aria-label="Открыть матч"
                                 size="small"
                                 color="primary"
                                 onClick={() => handleMatchClick(a.matchId)}
@@ -513,6 +574,7 @@ export default function AssignmentsPage() {
                             </Tooltip>
                             <Tooltip title="Снять назначение">
                               <IconButton
+                                aria-label="Снять назначение"
                                 size="small"
                                 color="error"
                                 onClick={() => handleDeleteClick(a.id)}
@@ -569,8 +631,8 @@ export default function AssignmentsPage() {
         <DialogTitle>Снять назначение</DialogTitle>
         <DialogContent>
           <Typography>
-            Вы уверены, что хотите снять это назначение? Судья будет убран
-            из бригады матча.
+            Вы уверены, что хотите снять это назначение? Судья будет убран из
+            бригады матча.
           </Typography>
         </DialogContent>
         <DialogActions>

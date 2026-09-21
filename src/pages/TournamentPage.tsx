@@ -1,3 +1,4 @@
+import { competitionPageSx } from '../components/competition/competitionStyles';
 // src/pages/TournamentPage.tsx
 
 import { useState, useMemo } from 'react';
@@ -279,7 +280,11 @@ export default function TournamentPage() {
       data: UpdateStageDto;
     }) => stageApi.update(tournamentId!, stageId, data),
     onSuccess: () => {
-      setSnackbar({ open: true, message: 'Этап обновлён', severity: 'success' });
+      setSnackbar({
+        open: true,
+        message: 'Этап обновлён',
+        severity: 'success',
+      });
       setEditDialogOpen(false);
       setEditingStage(null);
       setForm(defaultStageForm);
@@ -306,8 +311,7 @@ export default function TournamentPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (stageId: string) =>
-      stageApi.remove(tournamentId!, stageId),
+    mutationFn: (stageId: string) => stageApi.remove(tournamentId!, stageId),
     onSuccess: () => {
       setSnackbar({ open: true, message: 'Этап удалён', severity: 'success' });
       setDeleteDialogOpen(false);
@@ -333,9 +337,7 @@ export default function TournamentPage() {
       format: isContainer(form.type) ? null : (form.format as StageFormat),
       parentStageId: form.parentStageId || null,
       sortOrder: Number(form.sortOrder) || 0,
-      settings: form.settings.trim()
-        ? safeParseJson(form.settings)
-        : null,
+      settings: form.settings.trim() ? safeParseJson(form.settings) : null,
     };
     createMutation.mutate(payload);
   };
@@ -349,9 +351,7 @@ export default function TournamentPage() {
       format: isContainer(form.type) ? null : (form.format as StageFormat),
       parentStageId: form.parentStageId || null,
       sortOrder: Number(form.sortOrder) || 0,
-      settings: form.settings.trim()
-        ? safeParseJson(form.settings)
-        : null,
+      settings: form.settings.trim() ? safeParseJson(form.settings) : null,
     };
     updateMutation.mutate({ stageId: editingStage.id, data: payload });
   };
@@ -404,12 +404,9 @@ export default function TournamentPage() {
   };
 
   const handleOpenMatches = (stageId?: string) => {
-    // Переход на /matches. Фильтр по этапу пока не пробрасываем через URL —
-    // страница MatchesPage читает фильтры только из своего состояния.
-    // Если нужно — расширим MatchesPage, чтобы читал query-параметры.
-    navigate('/matches', {
-      state: { stageId, tournamentId },
-    });
+    const params = new URLSearchParams({ tournamentId: tournamentId! });
+    if (stageId) params.set('stageId', stageId);
+    navigate(`/matches?${params}`);
   };
 
   // ------------------------------------------------------------------
@@ -426,7 +423,7 @@ export default function TournamentPage() {
 
   if (isTournamentError || !tournament) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={competitionPageSx}>
         <Alert severity="error">
           {tournamentError instanceof AxiosError
             ? tournamentError.response?.data?.message ||
@@ -474,16 +471,16 @@ export default function TournamentPage() {
           error={!!fieldErrors.type}
           helperText={
             fieldErrors.type ||
-            'STAGE/PLAYOFF — контейнеры, GROUP — группа, ROUND — раунд'
+            'Группа и раунд содержат матчи. Этап и плей-офф объединяют вложенные этапы.'
           }
           fullWidth
           required
           disabled={isPending}
         >
-          <MenuItem value="STAGE">Этап (контейнер)</MenuItem>
+          <MenuItem value="STAGE">Этап — объединение групп</MenuItem>
           <MenuItem value="GROUP">Группа</MenuItem>
           <MenuItem value="ROUND">Раунд</MenuItem>
-          <MenuItem value="PLAYOFF">Плей-офф (контейнер)</MenuItem>
+          <MenuItem value="PLAYOFF">Плей-офф — объединение раундов</MenuItem>
         </TextField>
 
         {!container && (
@@ -495,7 +492,7 @@ export default function TournamentPage() {
             error={!!fieldErrors.format}
             helperText={
               fieldErrors.format ||
-              'Определяется типом: GROUP — круговой, ROUND — олимпийская'
+              'В группе команды играют по кругу, в раунде — на выбывание.'
             }
             fullWidth
             required
@@ -516,14 +513,13 @@ export default function TournamentPage() {
           onChange={(e) => handleFieldChange('parentStageId', e.target.value)}
           error={!!fieldErrors.parentStageId}
           helperText={
-            fieldErrors.parentStageId ||
-            'Оставьте пустым, если этап корневой'
+            fieldErrors.parentStageId || 'Оставьте пустым, если этап корневой'
           }
           fullWidth
           disabled={isPending}
         >
           <MenuItem value="">
-            <em>Корневой этап</em>
+            <em>Без родительского этапа</em>
           </MenuItem>
           {stages
             .filter((s) => s.id !== editingStage?.id)
@@ -546,26 +542,38 @@ export default function TournamentPage() {
           slotProps={{ htmlInput: { min: 0 } }}
         />
 
-        <TextField
-          label="Настройки (JSON)"
-          value={form.settings}
-          onChange={(e) => handleFieldChange('settings', e.target.value)}
-          error={!!fieldErrors.settings}
-          helperText={
-            fieldErrors.settings ||
-            'Опционально. Например: {"rounds": 2, "pointsForWin": 3}'
-          }
-          fullWidth
-          multiline
-          minRows={3}
-          maxRows={8}
-          disabled={isPending}
-          slotProps={{
-            input: {
-              style: { fontFamily: 'monospace', fontSize: 13 },
-            },
+        <Box
+          component="details"
+          open={fieldErrors.settings ? true : undefined}
+          sx={{
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            pt: 2,
+            '& summary': { cursor: 'pointer', fontWeight: 600, mb: 2 },
           }}
-        />
+        >
+          <summary>Дополнительные настройки регламента</summary>
+          <TextField
+            label="Настройки (JSON)"
+            value={form.settings}
+            onChange={(e) => handleFieldChange('settings', e.target.value)}
+            error={!!fieldErrors.settings}
+            helperText={
+              fieldErrors.settings ||
+              'Опционально. Например: {"rounds": 2, "pointsForWin": 3}'
+            }
+            fullWidth
+            multiline
+            minRows={3}
+            maxRows={8}
+            disabled={isPending}
+            slotProps={{
+              input: {
+                style: { fontFamily: 'monospace', fontSize: 13 },
+              },
+            }}
+          />
+        </Box>
       </Box>
     );
   };
@@ -575,7 +583,7 @@ export default function TournamentPage() {
   // ------------------------------------------------------------------
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={competitionPageSx}>
       {/* Шапка */}
       <Box
         sx={{
@@ -586,7 +594,11 @@ export default function TournamentPage() {
           flexWrap: 'wrap',
         }}
       >
-        <IconButton onClick={() => navigate('/tournaments')} size="small">
+        <IconButton
+          aria-label="К списку турниров"
+          onClick={() => navigate('/tournaments')}
+          size="small"
+        >
           <ArrowBackIcon />
         </IconButton>
 
@@ -617,12 +629,18 @@ export default function TournamentPage() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <CalendarIcon fontSize="small" color="action" />
             <Typography variant="body2" color="text.secondary">
-              {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}
+              {formatDate(tournament.startDate)} —{' '}
+              {formatDate(tournament.endDate)}
             </Typography>
           </Box>
         </Box>
       </Paper>
 
+      <Box sx={{ mb: 3 }}>
+        <Button variant="outlined" onClick={() => handleOpenMatches()}>
+          Открыть все матчи турнира
+        </Button>
+      </Box>
       {/* Список этапов */}
       <Paper sx={{ p: 3, position: 'relative' }}>
         <Box
@@ -706,7 +724,7 @@ export default function TournamentPage() {
 
                   return (
                     <TableRow key={s.id} hover>
-                      <TableCell>
+                      <TableCell data-label="Название">
                         <Typography
                           variant="body2"
                           sx={{
@@ -718,14 +736,14 @@ export default function TournamentPage() {
                           {s.name}
                         </Typography>
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Тип">
                         <Chip
                           label={STAGE_TYPE_LABELS[s.type]}
                           color={STAGE_TYPE_COLORS[s.type]}
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Формат">
                         {s.format ? (
                           <Typography variant="body2">
                             {STAGE_FORMAT_LABELS[s.format]}
@@ -736,7 +754,7 @@ export default function TournamentPage() {
                           </Typography>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Родитель">
                         {parent ? (
                           <Typography variant="body2" color="text.secondary">
                             {parent.name}
@@ -747,8 +765,10 @@ export default function TournamentPage() {
                           </Typography>
                         )}
                       </TableCell>
-                      <TableCell align="center">{s.sortOrder}</TableCell>
-                      <TableCell align="center">
+                      <TableCell data-label="Порядок" align="center">
+                        {s.sortOrder}
+                      </TableCell>
+                      <TableCell data-label="Действия" align="center">
                         <Box
                           sx={{
                             display: 'flex',
@@ -758,6 +778,7 @@ export default function TournamentPage() {
                         >
                           <Tooltip title="Матчи этапа">
                             <IconButton
+                              aria-label="Матчи этапа"
                               size="small"
                               color="primary"
                               onClick={() => handleOpenMatches(s.id)}
@@ -767,6 +788,7 @@ export default function TournamentPage() {
                           </Tooltip>
                           <Tooltip title="Редактировать">
                             <IconButton
+                              aria-label="Редактировать"
                               size="small"
                               onClick={() => handleEditOpen(s)}
                             >
@@ -775,6 +797,7 @@ export default function TournamentPage() {
                           </Tooltip>
                           <Tooltip title="Удалить">
                             <IconButton
+                              aria-label="Удалить"
                               size="small"
                               color="error"
                               onClick={() => handleDeleteClick(s.id)}
@@ -888,8 +911,8 @@ export default function TournamentPage() {
         <DialogTitle>Подтверждение удаления</DialogTitle>
         <DialogContent>
           <Typography>
-            Вы уверены, что хотите удалить этот этап? Если у него есть
-            дочерние этапы — удаление будет отклонено.
+            Вы уверены, что хотите удалить этот этап? Если у него есть дочерние
+            этапы — удаление будет отклонено.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -939,7 +962,11 @@ export default function TournamentPage() {
 function safeParseJson(text: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(text);
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+    ) {
       return parsed as Record<string, unknown>;
     }
     return null;

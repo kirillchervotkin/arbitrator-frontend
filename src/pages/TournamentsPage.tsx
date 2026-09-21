@@ -1,3 +1,10 @@
+import { competitionPageSx } from '../components/competition/competitionStyles';
+import {
+  CompetitionFilters,
+  CompetitionHeader,
+  CompetitionEmpty,
+  CompetitionSummary,
+} from '../components/competition/CompetitionPage';
 // src/pages/TournamentsPage.tsx
 
 import { useState, useEffect, useRef } from 'react';
@@ -128,12 +135,16 @@ export default function TournamentsPage() {
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
+  const [editingTournament, setEditingTournament] = useState<Tournament | null>(
+    null,
+  );
   const [form, setForm] = useState<TournamentForm>(defaultForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteTournamentId, setDeleteTournamentId] = useState<string | null>(null);
+  const [deleteTournamentId, setDeleteTournamentId] = useState<string | null>(
+    null,
+  );
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -203,7 +214,11 @@ export default function TournamentsPage() {
   const createMutation = useMutation({
     mutationFn: (payload: CreateTournamentDto) => tournamentApi.create(payload),
     onSuccess: () => {
-      setSnackbar({ open: true, message: 'Турнир создан', severity: 'success' });
+      setSnackbar({
+        open: true,
+        message: 'Турнир создан',
+        severity: 'success',
+      });
       setCreateDialogOpen(false);
       setForm(defaultForm);
       setFieldErrors({});
@@ -232,7 +247,11 @@ export default function TournamentsPage() {
     mutationFn: ({ id, data }: { id: string; data: UpdateTournamentDto }) =>
       tournamentApi.update(id, data),
     onSuccess: () => {
-      setSnackbar({ open: true, message: 'Турнир обновлён', severity: 'success' });
+      setSnackbar({
+        open: true,
+        message: 'Турнир обновлён',
+        severity: 'success',
+      });
       setEditDialogOpen(false);
       setEditingTournament(null);
       setForm(defaultForm);
@@ -261,7 +280,11 @@ export default function TournamentsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => tournamentApi.remove(id),
     onSuccess: () => {
-      setSnackbar({ open: true, message: 'Турнир удалён', severity: 'success' });
+      setSnackbar({
+        open: true,
+        message: 'Турнир удалён',
+        severity: 'success',
+      });
       setDeleteDialogOpen(false);
       setDeleteTournamentId(null);
       queryClient.invalidateQueries({ queryKey: ['tournaments'] });
@@ -346,7 +369,7 @@ export default function TournamentsPage() {
   };
 
   const handleRowClick = (tournamentId: string) => {
-    navigate(`/tournaments/${tournamentId}/stages`);
+    navigate(`/tournaments/${tournamentId}`);
   };
 
   // --- Рендер диалога (общий для create / edit) ---
@@ -389,7 +412,9 @@ export default function TournamentsPage() {
             select
             label="Тип *"
             value={form.type}
-            onChange={(e) => handleFieldChange('type', e.target.value as TournamentType)}
+            onChange={(e) =>
+              handleFieldChange('type', e.target.value as TournamentType)
+            }
             error={!!fieldErrors.type}
             helperText={fieldErrors.type || ''}
             fullWidth
@@ -444,100 +469,128 @@ export default function TournamentsPage() {
   // ------------------------------------------------------------------
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Турниры
-      </Typography>
+    <Box sx={competitionPageSx}>
+      <CompetitionHeader
+        title="Турниры"
+        description="Сезоны, структура этапов и календарь соревнований."
+        action={
+          <Button
+            variant="contained"
+            disableElevation
+            startIcon={<AddIcon />}
+            onClick={handleOpenCreateDialog}
+          >
+            Создать турнир
+          </Button>
+        }
+      />
 
+      <CompetitionSummary
+        items={[
+          {
+            label: 'Турниров в выборке',
+            value: isLoading ? '—' : visibleTournaments.length,
+          },
+        ]}
+      />
       {/* Панель фильтров */}
-      <Paper
-        sx={{
-          p: 2,
-          mb: 3,
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 2,
-          alignItems: 'center',
-        }}
-      >
-        <TextField
-          size="small"
-          placeholder="Поиск по названию..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          autoComplete="off"
-          sx={{ flex: 1, minWidth: 200 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-              endAdornment: searchInput && (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={handleClearSearch}>
-                    <ClearIcon />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            },
+      <CompetitionFilters active={Boolean(searchInput || typeFilter)}>
+        <Paper
+          sx={{
+            p: 2,
+            mb: 3,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 2,
+            alignItems: 'center',
           }}
-        />
-        <TextField
-          select
-          size="small"
-          label="Тип"
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as TournamentType | '')}
-          sx={{ minWidth: 160 }}
         >
-          <MenuItem value="">Все типы</MenuItem>
-          <MenuItem value="LEAGUE">Чемпионат</MenuItem>
-          <MenuItem value="CUP">Кубок</MenuItem>
-          <MenuItem value="SUPER_CUP">Суперкубок</MenuItem>
-        </TextField>
-        <Button
-          variant="contained"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          startIcon={
-            isFetching ? (
-              <CircularProgress size={20} color="inherit" />
-            ) : (
-              <RefreshIcon />
-            )
-          }
-        >
-          Обновить
-        </Button>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={handleOpenCreateDialog}
-        >
-          Создать
-        </Button>
-      </Paper>
+          <TextField
+            size="small"
+            label="Название турнира"
+            placeholder="Найти турнир"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            autoComplete="off"
+            sx={{ flex: 1, minWidth: 200 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+                endAdornment: searchInput && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={handleClearSearch}>
+                      <ClearIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <TextField
+            select
+            size="small"
+            label="Тип"
+            value={typeFilter}
+            onChange={(e) =>
+              setTypeFilter(e.target.value as TournamentType | '')
+            }
+            sx={{ minWidth: 160 }}
+          >
+            <MenuItem value="">Все типы</MenuItem>
+            <MenuItem value="LEAGUE">Чемпионат</MenuItem>
+            <MenuItem value="CUP">Кубок</MenuItem>
+            <MenuItem value="SUPER_CUP">Суперкубок</MenuItem>
+          </TextField>
+          <Button
+            variant="text"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            startIcon={
+              isFetching ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+          >
+            Обновить
+          </Button>
+        </Paper>
+      </CompetitionFilters>
 
       {/* Таблица */}
       <Paper sx={{ position: 'relative', overflow: 'hidden' }}>
         {isError ? (
           <Alert severity="error" sx={{ m: 2 }}>
             {error instanceof AxiosError
-              ? error.response?.data?.message ||
-                'Не удалось загрузить турниры'
+              ? error.response?.data?.message || 'Не удалось загрузить турниры'
               : 'Произошла неизвестная ошибка'}
           </Alert>
         ) : visibleTournaments.length === 0 && !isLoading ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body1" color="text.secondary">
-              {searchInput || typeFilter
-                ? 'Ничего не найдено по фильтрам'
-                : 'Турниры не найдены. Создайте первый турнир.'}
-            </Typography>
-          </Box>
+          <CompetitionEmpty
+            title={
+              searchInput || typeFilter
+                ? 'Турниры не найдены'
+                : 'Первый турнир начинается здесь'
+            }
+            description={
+              searchInput || typeFilter
+                ? 'Измените название или тип турнира.'
+                : 'Укажите сезон и даты. После создания добавьте этапы и матчи.'
+            }
+            action={
+              searchInput || typeFilter ? 'Сбросить фильтры' : 'Создать турнир'
+            }
+            onAction={
+              searchInput || typeFilter
+                ? handleClearSearch
+                : handleOpenCreateDialog
+            }
+          />
         ) : (
           <>
             <TableContainer>
@@ -560,26 +613,42 @@ export default function TournamentsPage() {
                       onClick={() => handleRowClick(t.id)}
                       sx={{ cursor: 'pointer' }}
                     >
-                      <TableCell>{t.name}</TableCell>
-                      <TableCell>{t.season}</TableCell>
-                      <TableCell>
+                      <TableCell data-label="Турнир">
+                        <Button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleRowClick(t.id);
+                          }}
+                          sx={{
+                            textAlign: 'left',
+                            justifyContent: 'flex-start',
+                            fontWeight: 700,
+                            p: 0,
+                          }}
+                        >
+                          {t.name}
+                        </Button>
+                      </TableCell>
+                      <TableCell data-label="Сезон">{t.season}</TableCell>
+                      <TableCell data-label="Тип">
                         <Chip
                           label={TOURNAMENT_TYPE_LABELS[t.type]}
                           color={TOURNAMENT_TYPE_COLORS[t.type]}
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Начало">
                         {t.startDate
                           ? new Date(t.startDate).toLocaleDateString('ru-RU')
                           : '—'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Окончание">
                         {t.endDate
                           ? new Date(t.endDate).toLocaleDateString('ru-RU')
                           : '—'}
                       </TableCell>
                       <TableCell
+                        data-label="Действия"
                         align="center"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -592,6 +661,7 @@ export default function TournamentsPage() {
                         >
                           <Tooltip title="Этапы">
                             <IconButton
+                              aria-label="Этапы"
                               size="small"
                               color="primary"
                               onClick={() => handleRowClick(t.id)}
@@ -601,6 +671,7 @@ export default function TournamentsPage() {
                           </Tooltip>
                           <Tooltip title="Редактировать">
                             <IconButton
+                              aria-label="Редактировать"
                               size="small"
                               onClick={() => handleEditOpen(t)}
                             >
@@ -609,6 +680,7 @@ export default function TournamentsPage() {
                           </Tooltip>
                           <Tooltip title="Удалить">
                             <IconButton
+                              aria-label="Удалить"
                               size="small"
                               color="error"
                               onClick={() => handleDeleteClick(t.id)}

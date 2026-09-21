@@ -1,7 +1,19 @@
+import { competitionPageSx } from '../components/competition/competitionStyles';
+import {
+  calendarDayBoundary,
+  calendarRangeError,
+} from '../utils/calendarFilters';
+import {
+  CompetitionFilters,
+  CompetitionHeader,
+  CompetitionEmpty,
+  CompetitionSummary,
+} from '../components/competition/CompetitionPage';
 // src/pages/MatchesPage.tsx
 
 import { useState, useMemo } from 'react';
 import {
+  Autocomplete,
   Box,
   Typography,
   Paper,
@@ -30,12 +42,11 @@ import {
   Add as AddIcon,
   Refresh as RefreshIcon,
   Clear as ClearIcon,
-  Visibility as VisibilityIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import {
   matchApi,
@@ -135,13 +146,39 @@ export default function MatchesPage() {
   const navigate = useNavigate();
 
   // --- Фильтры ---
-  const [tournamentFilter, setTournamentFilter] = useState('');
-  const [stageFilter, setStageFilter] = useState('');
-  const [teamFilter, setTeamFilter] = useState('');
-  const [cityFilter, setCityFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [offset, setOffset] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const updateFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    next.delete('offset');
+    if (key === 'tournamentId') next.delete('stageId');
+    setSearchParams(next);
+  };
+  const tournamentFilter = searchParams.get('tournamentId') ?? '';
+  const stageFilter = searchParams.get('stageId') ?? '';
+  const teamFilter = searchParams.get('teamId') ?? '';
+  const cityFilter = searchParams.get('cityId') ?? '';
+  const dateFrom = searchParams.get('dateFrom') ?? '';
+  const dateTo = searchParams.get('dateTo') ?? '';
+  const rawOffset = Number(searchParams.get('offset') ?? 0);
+  const offset =
+    Number.isSafeInteger(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+  const setOffset = (value: number) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('offset', String(value));
+    else next.delete('offset');
+    setSearchParams(next);
+  };
+  const setTournamentFilter = (value: string) =>
+    updateFilter('tournamentId', value);
+  const setStageFilter = (value: string) => updateFilter('stageId', value);
+  const setTeamFilter = (value: string) => updateFilter('teamId', value);
+  const setCityFilter = (value: string) => updateFilter('cityId', value);
+  const setDateFrom = (value: string) => updateFilter('dateFrom', value);
+  const setDateTo = (value: string) => updateFilter('dateTo', value);
+
+  const rangeError = calendarRangeError(dateFrom, dateTo);
 
   // --- Диалоги ---
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -171,14 +208,10 @@ export default function MatchesPage() {
   });
 
   // --- Запрос матчей с пагинацией ---
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useQuery<PaginatedResponse<Match>>({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery<
+    PaginatedResponse<Match>
+  >({
+    enabled: !rangeError,
     queryKey: [
       'matches',
       {
@@ -186,12 +219,8 @@ export default function MatchesPage() {
         stageId: stageFilter || undefined,
         teamId: teamFilter || undefined,
         cityId: cityFilter || undefined,
-        dateFrom: dateFrom
-          ? new Date(`${dateFrom}T00:00:00`).toISOString()
-          : undefined,
-        dateTo: dateTo
-          ? new Date(`${dateTo}T23:59:59`).toISOString()
-          : undefined,
+        dateFrom: calendarDayBoundary(dateFrom),
+        dateTo: calendarDayBoundary(dateTo, true),
         limit: LIMIT,
         offset,
       },
@@ -202,12 +231,8 @@ export default function MatchesPage() {
         stageId: stageFilter || undefined,
         teamId: teamFilter || undefined,
         cityId: cityFilter || undefined,
-        dateFrom: dateFrom
-          ? new Date(`${dateFrom}T00:00:00`).toISOString()
-          : undefined,
-        dateTo: dateTo
-          ? new Date(`${dateTo}T23:59:59`).toISOString()
-          : undefined,
+        dateFrom: calendarDayBoundary(dateFrom),
+        dateTo: calendarDayBoundary(dateTo, true),
         limit: LIMIT,
         offset,
         orderBy: 'matchDate',
@@ -251,10 +276,7 @@ export default function MatchesPage() {
   // Все этапы — грузим один раз, чтобы использовать
   // и в фильтре, и в таблице, и в форме
   const { data: allStages = [] } = useQuery<Stage[]>({
-    queryKey: [
-      'stages-all',
-      tournaments.map((t) => t.id).join(','),
-    ],
+    queryKey: ['stages-all', tournaments.map((t) => t.id).join(',')],
     queryFn: async () => {
       const all: Stage[] = [];
       for (const t of tournaments) {
@@ -359,7 +381,11 @@ export default function MatchesPage() {
     mutationFn: ({ id, data }: { id: string; data: UpdateMatchDto }) =>
       matchApi.update(id, data),
     onSuccess: () => {
-      setSnackbar({ open: true, message: 'Матч обновлён', severity: 'success' });
+      setSnackbar({
+        open: true,
+        message: 'Матч обновлён',
+        severity: 'success',
+      });
       setEditDialogOpen(false);
       setEditingMatch(null);
       setForm(defaultForm);
@@ -438,8 +464,7 @@ export default function MatchesPage() {
       stageId: match.stageId,
       matchDate: isoToDatetimeLocal(match.matchDate),
       cityId: match.cityId,
-      tourNumber:
-        match.tourNumber !== null ? String(match.tourNumber) : '',
+      tourNumber: match.tourNumber !== null ? String(match.tourNumber) : '',
       homeTeamId: match.homeTeamId ?? '',
       awayTeamId: match.awayTeamId ?? '',
       homeScore: match.homeScore !== null ? String(match.homeScore) : '',
@@ -458,15 +483,7 @@ export default function MatchesPage() {
     if (deleteMatchId) deleteMutation.mutate(deleteMatchId);
   };
 
-  const handleClearFilters = () => {
-    setTournamentFilter('');
-    setStageFilter('');
-    setTeamFilter('');
-    setCityFilter('');
-    setDateFrom('');
-    setDateTo('');
-    setOffset(0);
-  };
+  const handleClearFilters = () => setSearchParams({});
 
   const handleFieldChange = (field: keyof MatchForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -476,18 +493,20 @@ export default function MatchesPage() {
   };
 
   const handleOpenCreateDialog = () => {
-    setForm(defaultForm);
-    setFormTournamentId('');
+    setForm({ ...defaultForm, stageId: stageFilter });
+    setFormTournamentId(tournamentFilter);
     setFieldErrors({});
     setCreateDialogOpen(true);
   };
 
   const handleRowClick = (matchId: string) => {
-    navigate(`/matches/${matchId}`);
+    navigate(`/matches/${matchId}`, {
+      state: { returnTo: `/matches?${searchParams}` },
+    });
   };
 
-  const nextPage = () => setOffset((prev) => prev + LIMIT);
-  const prevPage = () => setOffset((prev) => Math.max(0, prev - LIMIT));
+  const nextPage = () => setOffset(offset + LIMIT);
+  const prevPage = () => setOffset(Math.max(0, offset - LIMIT));
 
   const hasFilters = Boolean(
     tournamentFilter ||
@@ -532,7 +551,9 @@ export default function MatchesPage() {
         value={form.stageId}
         onChange={(e) => handleFieldChange('stageId', e.target.value)}
         error={!!fieldErrors.stageId}
-        helperText={fieldErrors.stageId || ''}
+        helperText={
+          fieldErrors.stageId || 'Матчи создаются в группе или раунде турнира'
+        }
         fullWidth
         required
         disabled={isPending || !formTournamentId}
@@ -540,46 +561,49 @@ export default function MatchesPage() {
         <MenuItem value="">
           <em>Выберите этап</em>
         </MenuItem>
-        {formStages.map((s) => (
-          <MenuItem key={s.id} value={s.id}>
-            {s.name}
-          </MenuItem>
-        ))}
+        {formStages
+          .filter((s) => s.type === 'GROUP' || s.type === 'ROUND')
+          .map((s) => (
+            <MenuItem key={s.id} value={s.id}>
+              {s.name}
+            </MenuItem>
+          ))}
       </TextField>
 
       <TextField
-        label="Дата и время *"
+        label="Дата и время"
         type="datetime-local"
         value={form.matchDate}
         onChange={(e) => handleFieldChange('matchDate', e.target.value)}
         error={!!fieldErrors.matchDate}
-        helperText={fieldErrors.matchDate || ''}
+        helperText={fieldErrors.matchDate || 'Местное время вашего устройства'}
         fullWidth
         required
         disabled={isPending}
         slotProps={{ inputLabel: { shrink: true } }}
       />
 
-      <TextField
-        select
-        label="Город *"
-        value={form.cityId}
-        onChange={(e) => handleFieldChange('cityId', e.target.value)}
-        error={!!fieldErrors.cityId}
-        helperText={fieldErrors.cityId || ''}
-        fullWidth
-        required
+      <Autocomplete
+        options={cities}
+        value={cities.find((c) => c.id === form.cityId) ?? null}
+        getOptionLabel={(city) => city.name}
+        isOptionEqualToValue={(a, b) => a.id === b.id}
+        onChange={(_, city) => handleFieldChange('cityId', city?.id ?? '')}
+        noOptionsText="Город не найден"
+        clearText="Сбросить"
+        openText="Показать города"
+        closeText="Закрыть"
         disabled={isPending}
-      >
-        <MenuItem value="">
-          <em>Выберите город</em>
-        </MenuItem>
-        {cities.map((c) => (
-          <MenuItem key={c.id} value={c.id}>
-            {c.name}
-          </MenuItem>
-        ))}
-      </TextField>
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Город"
+            required
+            error={!!fieldErrors.cityId}
+            helperText={fieldErrors.cityId}
+          />
+        )}
+      />
 
       <TextField
         label="Номер тура"
@@ -646,38 +670,39 @@ export default function MatchesPage() {
       </Typography>
 
       <TextField
-        label="Дата и время *"
+        label="Дата и время"
         type="datetime-local"
         value={form.matchDate}
         onChange={(e) => handleFieldChange('matchDate', e.target.value)}
         error={!!fieldErrors.matchDate}
-        helperText={fieldErrors.matchDate || ''}
+        helperText={fieldErrors.matchDate || 'Местное время вашего устройства'}
         fullWidth
         required
         disabled={isPending}
         slotProps={{ inputLabel: { shrink: true } }}
       />
 
-      <TextField
-        select
-        label="Город *"
-        value={form.cityId}
-        onChange={(e) => handleFieldChange('cityId', e.target.value)}
-        error={!!fieldErrors.cityId}
-        helperText={fieldErrors.cityId || ''}
-        fullWidth
-        required
+      <Autocomplete
+        options={cities}
+        value={cities.find((c) => c.id === form.cityId) ?? null}
+        getOptionLabel={(city) => city.name}
+        isOptionEqualToValue={(a, b) => a.id === b.id}
+        onChange={(_, city) => handleFieldChange('cityId', city?.id ?? '')}
+        noOptionsText="Город не найден"
+        clearText="Сбросить"
+        openText="Показать города"
+        closeText="Закрыть"
         disabled={isPending}
-      >
-        <MenuItem value="">
-          <em>Выберите город</em>
-        </MenuItem>
-        {cities.map((c) => (
-          <MenuItem key={c.id} value={c.id}>
-            {c.name}
-          </MenuItem>
-        ))}
-      </TextField>
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Город"
+            required
+            error={!!fieldErrors.cityId}
+            helperText={fieldErrors.cityId}
+          />
+        )}
+      />
 
       <TextField
         label="Номер тура"
@@ -766,168 +791,183 @@ export default function MatchesPage() {
   // ------------------------------------------------------------------
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Матчи
-      </Typography>
-
-      {/* Панель фильтров */}
-      <Paper
-        sx={{
-          p: 2,
-          mb: 3,
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 2,
-          alignItems: 'center',
-        }}
-      >
-        <TextField
-          select
-          size="small"
-          label="Турнир"
-          value={tournamentFilter}
-          onChange={(e) => {
-            setTournamentFilter(e.target.value);
-            setStageFilter('');
-            setOffset(0);
-          }}
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="">
-            <em>Все турниры</em>
-          </MenuItem>
-          {tournaments.map((t) => (
-            <MenuItem key={t.id} value={t.id}>
-              {t.name}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <TextField
-          select
-          size="small"
-          label="Этап"
-          value={stageFilter}
-          onChange={(e) => {
-            setStageFilter(e.target.value);
-            setOffset(0);
-          }}
-          disabled={!tournamentFilter}
-          sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">
-            <em>Все этапы</em>
-          </MenuItem>
-          {filterStages.map((s) => (
-            <MenuItem key={s.id} value={s.id}>
-              {s.name}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <TextField
-          select
-          size="small"
-          label="Команда"
-          value={teamFilter}
-          onChange={(e) => {
-            setTeamFilter(e.target.value);
-            setOffset(0);
-          }}
-          sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">
-            <em>Все команды</em>
-          </MenuItem>
-          {teams.map((t) => (
-            <MenuItem key={t.id} value={t.id}>
-              {t.name}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <TextField
-          select
-          size="small"
-          label="Город"
-          value={cityFilter}
-          onChange={(e) => {
-            setCityFilter(e.target.value);
-            setOffset(0);
-          }}
-          sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">
-            <em>Все города</em>
-          </MenuItem>
-          {cities.map((c) => (
-            <MenuItem key={c.id} value={c.id}>
-              {c.name}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <TextField
-          size="small"
-          label="С"
-          type="date"
-          value={dateFrom}
-          onChange={(e) => {
-            setDateFrom(e.target.value);
-            setOffset(0);
-          }}
-          slotProps={{ inputLabel: { shrink: true } }}
-          sx={{ minWidth: 160 }}
-        />
-
-        <TextField
-          size="small"
-          label="По"
-          type="date"
-          value={dateTo}
-          onChange={(e) => {
-            setDateTo(e.target.value);
-            setOffset(0);
-          }}
-          slotProps={{ inputLabel: { shrink: true } }}
-          sx={{ minWidth: 160 }}
-        />
-
-        {hasFilters && (
+    <Box sx={competitionPageSx}>
+      <CompetitionHeader
+        title="Матчи"
+        description="Календарь матчей, результаты и переход к судейской бригаде."
+        action={
           <Button
-            variant="outlined"
-            size="small"
-            startIcon={<ClearIcon />}
-            onClick={handleClearFilters}
+            variant="contained"
+            disableElevation
+            startIcon={<AddIcon />}
+            onClick={handleOpenCreateDialog}
           >
-            Сбросить
+            Создать матч
           </Button>
-        )}
+        }
+      />
 
-        <Button
-          variant="contained"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          startIcon={
-            isFetching ? (
-              <CircularProgress size={20} color="inherit" />
-            ) : (
-              <RefreshIcon />
-            )
-          }
+      <CompetitionSummary
+        items={[
+          {
+            label: 'Матчей по выбранным условиям',
+            value: isLoading ? '—' : total,
+          },
+          {
+            label: 'Матчей на странице',
+            value: isLoading ? '—' : matches.length,
+          },
+        ]}
+      />
+      {rangeError && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {rangeError}
+        </Alert>
+      )}
+      {/* Панель фильтров */}
+      <CompetitionFilters active={hasFilters}>
+        <Paper
+          sx={{
+            p: 2,
+            mb: 3,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 2,
+            alignItems: 'center',
+          }}
         >
-          Обновить
-        </Button>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={handleOpenCreateDialog}
-        >
-          Создать
-        </Button>
-      </Paper>
+          <TextField
+            select
+            size="small"
+            label="Турнир"
+            value={tournamentFilter}
+            onChange={(e) => {
+              setTournamentFilter(e.target.value);
+            }}
+            sx={{ minWidth: 200 }}
+          >
+            <MenuItem value="">
+              <em>Все турниры</em>
+            </MenuItem>
+            {tournaments.map((t) => (
+              <MenuItem key={t.id} value={t.id}>
+                {t.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            size="small"
+            label="Этап"
+            value={stageFilter}
+            onChange={(e) => {
+              setStageFilter(e.target.value);
+            }}
+            disabled={!tournamentFilter}
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="">
+              <em>Все этапы</em>
+            </MenuItem>
+            {filterStages.map((s) => (
+              <MenuItem key={s.id} value={s.id}>
+                {s.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            size="small"
+            label="Команда"
+            value={teamFilter}
+            onChange={(e) => {
+              setTeamFilter(e.target.value);
+            }}
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="">
+              <em>Все команды</em>
+            </MenuItem>
+            {teams.map((t) => (
+              <MenuItem key={t.id} value={t.id}>
+                {t.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            size="small"
+            label="Город"
+            value={cityFilter}
+            onChange={(e) => {
+              setCityFilter(e.target.value);
+            }}
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="">
+              <em>Все города</em>
+            </MenuItem>
+            {cities.map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            size="small"
+            label="С"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+            }}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ minWidth: 160 }}
+          />
+
+          <TextField
+            size="small"
+            label="По"
+            type="date"
+            value={dateTo}
+            onChange={(e) => {
+              setDateTo(e.target.value);
+            }}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ minWidth: 160 }}
+          />
+
+          {hasFilters && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ClearIcon />}
+              onClick={handleClearFilters}
+            >
+              Сбросить
+            </Button>
+          )}
+
+          <Button
+            variant="text"
+            onClick={() => refetch()}
+            disabled={isFetching || Boolean(rangeError)}
+            startIcon={
+              isFetching ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+          >
+            Обновить
+          </Button>
+        </Paper>
+      </CompetitionFilters>
 
       {/* Таблица */}
       <Paper sx={{ position: 'relative', overflow: 'hidden' }}>
@@ -938,13 +978,16 @@ export default function MatchesPage() {
               : 'Произошла неизвестная ошибка'}
           </Alert>
         ) : matches.length === 0 && !isLoading ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body1" color="text.secondary">
-              {hasFilters
-                ? 'Ничего не найдено по фильтрам'
-                : 'Матчи не найдены. Создайте первый матч.'}
-            </Typography>
-          </Box>
+          <CompetitionEmpty
+            title={hasFilters ? 'Матчи не найдены' : 'Календарь пока пуст'}
+            description={
+              hasFilters
+                ? 'Измените условия поиска или сбросьте фильтры.'
+                : 'Создайте матч в игровом этапе турнира, затем назначьте судейскую бригаду.'
+            }
+            action={hasFilters ? 'Сбросить фильтры' : 'Создать матч'}
+            onAction={hasFilters ? handleClearFilters : handleOpenCreateDialog}
+          />
         ) : (
           <>
             <TableContainer>
@@ -968,8 +1011,10 @@ export default function MatchesPage() {
                       onClick={() => handleRowClick(m.id)}
                       sx={{ cursor: 'pointer' }}
                     >
-                      <TableCell>{formatMatchDate(m.matchDate)}</TableCell>
-                      <TableCell>
+                      <TableCell data-label="Дата и время">
+                        {formatMatchDate(m.matchDate)}
+                      </TableCell>
+                      <TableCell data-label="Турнир / этап">
                         <Box
                           sx={{
                             display: 'flex',
@@ -987,29 +1032,30 @@ export default function MatchesPage() {
                           />
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Хозяева">
                         {m.homeTeamId
-                          ? teamMap.get(m.homeTeamId) ?? '—'
+                          ? (teamMap.get(m.homeTeamId) ?? '—')
                           : '—'}
                       </TableCell>
-                      <TableCell align="center">
+                      <TableCell data-label="Счёт" align="center">
                         {m.homeScore !== null && m.awayScore !== null ? (
                           <Typography sx={{ fontWeight: 600 }}>
                             {m.homeScore} : {m.awayScore}
                           </Typography>
                         ) : (
-                          <Typography color="text.secondary">
-                            — : —
-                          </Typography>
+                          <Typography color="text.secondary">— : —</Typography>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Гости">
                         {m.awayTeamId
-                          ? teamMap.get(m.awayTeamId) ?? '—'
+                          ? (teamMap.get(m.awayTeamId) ?? '—')
                           : '—'}
                       </TableCell>
-                      <TableCell>{cityMap.get(m.cityId) ?? '—'}</TableCell>
+                      <TableCell data-label="Город">
+                        {cityMap.get(m.cityId) ?? '—'}
+                      </TableCell>
                       <TableCell
+                        data-label="Действия"
                         align="center"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -1020,17 +1066,16 @@ export default function MatchesPage() {
                             gap: 0.5,
                           }}
                         >
-                          <Tooltip title="Открыть">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleRowClick(m.id)}
-                            >
-                              <VisibilityIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleRowClick(m.id)}
+                          >
+                            Бригада
+                          </Button>
                           <Tooltip title="Редактировать">
                             <IconButton
+                              aria-label="Редактировать"
                               size="small"
                               onClick={() => handleEditOpen(m)}
                             >
@@ -1039,6 +1084,7 @@ export default function MatchesPage() {
                           </Tooltip>
                           <Tooltip title="Удалить">
                             <IconButton
+                              aria-label="Удалить"
                               size="small"
                               color="error"
                               onClick={() => handleDeleteClick(m.id)}
@@ -1061,10 +1107,12 @@ export default function MatchesPage() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 p: 2,
+                flexWrap: 'wrap',
+                gap: 2,
               }}
             >
               <Typography variant="body2" color="text.secondary">
-                Всего: {total} матчей. Показано с {offset + 1} по{' '}
+                Всего: {total} матчей. Показано с {total ? offset + 1 : 0} по{' '}
                 {Math.min(offset + LIMIT, total)}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>

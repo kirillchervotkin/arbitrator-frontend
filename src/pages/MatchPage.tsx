@@ -1,8 +1,11 @@
+import { competitionPageSx } from '../components/competition/competitionStyles';
+import { CompetitionEmpty } from '../components/competition/CompetitionPage';
 // src/pages/MatchPage.tsx
 
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
+  Autocomplete,
   Box,
   Typography,
   Paper,
@@ -89,6 +92,12 @@ const defaultAssignmentForm: CreateAssignmentForm = {
 export default function MatchPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo =
+    typeof location.state?.returnTo === 'string' &&
+    /^\/(matches|assignments)\?/.test(location.state.returnTo)
+      ? location.state.returnTo
+      : '/matches';
   const queryClient = useQueryClient();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -150,21 +159,13 @@ export default function MatchPage() {
     },
   });
 
-  // Мапа ролей для быстрого доступа
-  const roleMap = useMemo(() => {
-    const map = new Map<string, FieldRole>();
-    for (const r of fieldRoles) map.set(r.id, r);
-    return map;
-  }, [fieldRoles]);
-
   // Фильтр пользователей: только активные
-  const activeUsers = useMemo(
-    () => users.filter((u) => u.isActive),
-    [users],
-  );
+  const activeUsers = useMemo(() => users.filter((u) => u.isActive), [users]);
 
   // --- Извлечение ошибок полей ---
-  const extractFieldErrors = (err: unknown): {
+  const extractFieldErrors = (
+    err: unknown,
+  ): {
     userId?: string;
     fieldRoleId?: string;
   } => {
@@ -196,6 +197,7 @@ export default function MatchPage() {
       setForm(defaultAssignmentForm);
       setFieldErrors({});
       queryClient.invalidateQueries({ queryKey: ['match-crew', matchId] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
     onError: (err: unknown) => {
       const fe = extractFieldErrors(err);
@@ -210,7 +212,8 @@ export default function MatchPage() {
         // Особый случай: 409 может означать "дубликат" или "два матча в день"
         let msg: string;
         if (err instanceof AxiosError && err.response?.status === 409) {
-          msg = err.response.data?.message ||
+          msg =
+            err.response.data?.message ||
             'Судья уже назначен на этот матч или на другой матч в тот же день';
         } else if (err instanceof AxiosError) {
           msg = err.response?.data?.message || 'Ошибка создания назначения';
@@ -233,6 +236,7 @@ export default function MatchPage() {
       setDeleteDialogOpen(false);
       setDeleteAssignmentId(null);
       queryClient.invalidateQueries({ queryKey: ['match-crew', matchId] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
     onError: (err: unknown) => {
       const msg =
@@ -282,7 +286,7 @@ export default function MatchPage() {
 
   if (isError || !crew) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={competitionPageSx}>
         <Alert
           severity="error"
           action={
@@ -298,7 +302,7 @@ export default function MatchPage() {
         <Button
           sx={{ mt: 2 }}
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(returnTo)}
         >
           Назад
         </Button>
@@ -313,7 +317,7 @@ export default function MatchPage() {
   // ------------------------------------------------------------------
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={competitionPageSx}>
       {/* Шапка */}
       <Box
         sx={{
@@ -324,11 +328,19 @@ export default function MatchPage() {
           flexWrap: 'wrap',
         }}
       >
-        <IconButton onClick={() => navigate(-1)} size="small">
+        <IconButton
+          aria-label={
+            returnTo.startsWith('/assignments')
+              ? 'К списку назначений'
+              : 'К списку матчей'
+          }
+          onClick={() => navigate(returnTo)}
+          size="small"
+        >
           <ArrowBackIcon />
         </IconButton>
 
-        <Box sx={{ flex: 1, minWidth: 200 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="h5" sx={{ fontWeight: 600 }}>
             Матч
           </Typography>
@@ -340,12 +352,12 @@ export default function MatchPage() {
 
         <Tooltip title="Обновить">
           <span>
-            <IconButton onClick={() => refetch()} disabled={isFetching}>
-              {isFetching ? (
-                <CircularProgress size={20} />
-              ) : (
-                <RefreshIcon />
-              )}
+            <IconButton
+              aria-label="Обновить матч"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              {isFetching ? <CircularProgress size={20} /> : <RefreshIcon />}
             </IconButton>
           </span>
         </Tooltip>
@@ -381,13 +393,24 @@ export default function MatchPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexDirection: { xs: 'column', sm: 'row' },
             gap: 2,
             flexWrap: 'wrap',
           }}
         >
           {/* Хозяева */}
-          <Box sx={{ flex: 1, textAlign: 'right', minWidth: 150 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Box
+            sx={{
+              flex: 1,
+              textAlign: { xs: 'center', sm: 'right' },
+              minWidth: 0,
+              overflowWrap: 'anywhere',
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 600, fontSize: { xs: 16, sm: 20 } }}
+            >
               {crew.homeTeamName ?? 'Не определена'}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -398,12 +421,12 @@ export default function MatchPage() {
           {/* Счёт */}
           <Box
             sx={{
-              px: 3,
+              px: { xs: 1, sm: 3 },
               py: 1.5,
-              borderRadius: 2,
+              borderRadius: '12px',
               bgcolor: hasScore ? 'primary.main' : 'action.hover',
               color: hasScore ? 'primary.contrastText' : 'text.secondary',
-              minWidth: 100,
+              minWidth: { xs: 64, sm: 100 },
               textAlign: 'center',
             }}
           >
@@ -419,8 +442,18 @@ export default function MatchPage() {
           </Box>
 
           {/* Гости */}
-          <Box sx={{ flex: 1, textAlign: 'left', minWidth: 150 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Box
+            sx={{
+              flex: 1,
+              textAlign: { xs: 'center', sm: 'left' },
+              minWidth: 0,
+              overflowWrap: 'anywhere',
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 600, fontSize: { xs: 16, sm: 20 } }}
+            >
               {crew.awayTeamName ?? 'Не определена'}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -438,11 +471,16 @@ export default function MatchPage() {
             justifyContent: 'space-between',
             alignItems: 'center',
             mb: 2,
+            flexWrap: 'wrap',
+            gap: 2,
           }}
         >
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography
+            variant="h6"
+            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+          >
             <SportsSoccerIcon />
-            Бригада
+            Судейская бригада <Chip size="small" label={crew.crew.length} />
           </Typography>
           <Button
             variant="contained"
@@ -458,15 +496,15 @@ export default function MatchPage() {
         <Divider sx={{ mb: 2 }} />
 
         {crew.crew.length === 0 ? (
-          <Box sx={{ py: 4, textAlign: 'center' }}>
-            <Typography color="text.secondary">
-              Бригада не назначена. Назначьте судей на этот матч.
-            </Typography>
-          </Box>
+          <CompetitionEmpty
+            title="Бригада ещё не назначена"
+            description="Выберите судью и его роль на этом матче."
+            action="Назначить первого судью"
+            onAction={handleOpenCreateDialog}
+          />
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {crew.crew.map((a: AssignmentWithDetails) => {
-              const role = roleMap.get(a.fieldRoleId);
               return (
                 <Paper
                   key={a.id}
@@ -483,26 +521,19 @@ export default function MatchPage() {
                     label={a.roleName}
                     color="primary"
                     size="small"
-                    sx={{ minWidth: 140 }}
+                    variant="outlined"
+                    sx={{ minWidth: 140, width: { xs: '100%', sm: 'auto' } }}
                   />
 
-                  <Box sx={{ flex: 1, minWidth: 200 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
                       {a.userLastName} {a.userFirstName}
                     </Typography>
-                    {role && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontFamily: 'monospace' }}
-                      >
-                        {a.roleCode}
-                      </Typography>
-                    )}
                   </Box>
 
                   <Tooltip title="Снять назначение">
                     <IconButton
+                      aria-label="Снять назначение"
                       size="small"
                       color="error"
                       onClick={() => handleDeleteClick(a.id)}
@@ -550,31 +581,41 @@ export default function MatchPage() {
         <DialogTitle>Назначить судью на матч</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField
-              select
-              label="Судья *"
-              value={form.userId}
-              onChange={(e) => {
-                setForm({ ...form, userId: e.target.value });
-                if (fieldErrors.userId) {
-                  setFieldErrors({ ...fieldErrors, userId: undefined });
-                }
+            <Typography variant="body2" color="text.secondary">
+              {crew.homeTeamName ?? 'Хозяева не определены'} —{' '}
+              {crew.awayTeamName ?? 'Гости не определены'} ·{' '}
+              {formatMatchDate(crew.matchDate)}
+            </Typography>
+            <Autocomplete
+              options={activeUsers.filter(
+                (u) => !crew.crew.some((a) => a.userId === u.id),
+              )}
+              value={activeUsers.find((u) => u.id === form.userId) ?? null}
+              getOptionLabel={formatUserName}
+              isOptionEqualToValue={(a, b) => a.id === b.id}
+              onChange={(_, user) => {
+                setForm({ ...form, userId: user?.id ?? '' });
+                setFieldErrors({ ...fieldErrors, userId: undefined });
               }}
-              error={!!fieldErrors.userId}
-              helperText={fieldErrors.userId || ''}
-              fullWidth
-              required
+              noOptionsText="Нет доступных судей"
+              clearText="Сбросить"
+              openText="Показать судей"
+              closeText="Закрыть"
               disabled={createMutation.isPending}
-            >
-              <MenuItem value="">
-                <em>Выберите судью</em>
-              </MenuItem>
-              {activeUsers.map((u) => (
-                <MenuItem key={u.id} value={u.id}>
-                  {formatUserName(u)}
-                </MenuItem>
-              ))}
-            </TextField>
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Судья"
+                  placeholder="Введите имя или фамилию"
+                  required
+                  error={!!fieldErrors.userId}
+                  helperText={
+                    fieldErrors.userId ||
+                    'Уже назначенные на этот матч судьи скрыты'
+                  }
+                />
+              )}
+            />
 
             <TextField
               select
@@ -606,8 +647,8 @@ export default function MatchPage() {
             </TextField>
 
             <Alert severity="info" variant="outlined">
-              Бэкенд проверит, что судья не назначен на этот матч дважды
-              и не судит другой матч в тот же день.
+              На один день судье можно назначить только один матч. При
+              совпадении дат вы увидите причину конфликта.
             </Alert>
           </Box>
         </DialogContent>
@@ -622,9 +663,7 @@ export default function MatchPage() {
             onClick={handleCreate}
             variant="contained"
             disabled={
-              createMutation.isPending ||
-              !form.userId ||
-              !form.fieldRoleId
+              createMutation.isPending || !form.userId || !form.fieldRoleId
             }
           >
             {createMutation.isPending ? (
@@ -644,8 +683,8 @@ export default function MatchPage() {
         <DialogTitle>Снять назначение</DialogTitle>
         <DialogContent>
           <Typography>
-            Вы уверены, что хотите снять это назначение? Судья будет убран
-            из бригады матча.
+            Вы уверены, что хотите снять это назначение? Судья будет убран из
+            бригады матча.
           </Typography>
         </DialogContent>
         <DialogActions>
